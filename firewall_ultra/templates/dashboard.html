@@ -1,0 +1,321 @@
+{% extends "base.html" %}
+{% block title %}Espace Formateur | UIMM{% endblock %}
+{% block body_class %}page-dashboard{% endblock %}
+
+{% block body %}
+<div class="dashboard-container">
+
+    <!-- ── Header glass ── -->
+    <header class="dashboard-header">
+        <div class="header-left">
+            <img src="{{ url_for('static', filename='images/logo_uimm.jpg') }}"
+                 alt="UIMM" class="header-logo">
+            <div class="header-title">
+                <h1>Espace Formateur</h1>
+                <p>Salle G — Gestion des accès</p>
+            </div>
+        </div>
+        <div class="header-right">
+            <div class="user-info">
+                <span class="user-icon">👤</span>
+                <span class="user-label">Formateur</span>
+            </div>
+            <a href="{{ url_for('logout') }}" class="btn btn-logout">
+                <span class="btn-icon">🚪</span>
+                <span class="btn-text">Déconnexion</span>
+            </a>
+        </div>
+    </header>
+
+    <!-- ── Bannière mode (parallax GSAP) ── -->
+    <div class="mode-banner mode-banner-{{ mode_actif }}">
+        <div class="banner-content">
+            <span class="banner-icon">
+                {% if mode_actif == 'total' %}🌐{% elif mode_actif == 'partiel' %}📋{% else %}🔒{% endif %}
+            </span>
+            <div class="banner-text">
+                <span class="banner-label">Mode actuel :</span>
+                <span class="banner-mode">{{ modes[mode_actif].nom }}</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── Contenu (scroll sections) ── -->
+    <main class="dashboard-main">
+        <p class="section-title scroll-section">Choisir un mode d'accès</p>
+
+        <!-- Grille 3 modes (scale-out GSAP) -->
+        <div class="modes-grid scroll-section">
+
+            <div class="mode-card mode-card-total {% if mode_actif == 'total' %}active{% endif %}">
+                <span class="mode-icon">🌐</span>
+                <h3 class="mode-name">Accès Total</h3>
+                <p class="mode-description">
+                    Accès complet à internet sauf les catégories bloquées
+                    (pornographie, réseaux sociaux, jeux vidéo…)
+                </p>
+                <div class="mode-actions">
+                    {% if mode_actif != 'total' %}
+                    <button class="btn btn-activate btn-mode-total"
+                            onclick="confirmChangeMode('total','Accès Total')">
+                        Activer ce mode
+                    </button>
+                    {% else %}
+                    <span class="mode-active-badge badge-total">
+                        <span class="badge-icon">✓</span> Mode actif
+                    </span>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="mode-card mode-card-partiel {% if mode_actif == 'partiel' %}active{% endif %}">
+                <span class="mode-icon">📋</span>
+                <h3 class="mode-name">Accès Partiel</h3>
+                <p class="mode-description">
+                    Accès uniquement aux sites activés dans la liste.
+                    Idéal pour les travaux dirigés.
+                </p>
+                <div class="mode-actions">
+                    {% if mode_actif != 'partiel' %}
+                    <button class="btn btn-activate btn-mode-partiel"
+                            onclick="confirmChangeMode('partiel','Accès Partiel')">
+                        Activer ce mode
+                    </button>
+                    {% else %}
+                    <span class="mode-active-badge badge-partiel">
+                        <span class="badge-icon">✓</span> Mode actif
+                    </span>
+                    {% endif %}
+                    <button class="btn btn-secondary btn-small btn-toggle-packs"
+                            onclick="togglePacks()" id="btnTogglePacks">
+                        <span id="togglePacksIcon">▼</span>
+                        <span id="togglePacksText">Voir les sites autorisés</span>
+                    </button>
+                </div>
+            </div>
+
+            <div class="mode-card mode-card-aucun {% if mode_actif == 'aucun' %}active{% endif %}">
+                <span class="mode-icon">🔒</span>
+                <h3 class="mode-name">Aucun Accès</h3>
+                <p class="mode-description">
+                    Pas d'accès internet via le navigateur.
+                    Seuls Office 365 et les applications métier fonctionnent.
+                </p>
+                <div class="mode-actions">
+                    {% if mode_actif != 'aucun' %}
+                    <button class="btn btn-activate btn-mode-aucun"
+                            onclick="confirmChangeMode('aucun','Aucun Accès')">
+                        Activer ce mode
+                    </button>
+                    {% else %}
+                    <span class="mode-active-badge badge-aucun">
+                        <span class="badge-icon">✓</span> Mode actif
+                    </span>
+                    {% endif %}
+                </div>
+            </div>
+
+        </div>
+
+        <!-- ── Section Packs ── -->
+        <div id="packsSection" class="packs-section scroll-section" style="display:none;">
+            <div class="packs-header">
+                <h2 class="packs-title">Sites autorisés — Accès Partiel</h2>
+                <p class="packs-subtitle">
+                    Cochez les sites à autoriser, puis cliquez sur « Valider la sélection ».
+                </p>
+                <p class="packs-notice">
+                    <span class="notice-icon">🔒</span>
+                    Les sites <strong>Toujours actif</strong> ne peuvent pas être désactivés.
+                </p>
+            </div>
+
+            <form action="{{ url_for('update_packs') }}" method="POST" id="packsForm"
+                  data-no-transition>
+                <div class="packs-grid">
+                    {% for pack in packs %}
+                    <div class="pack-card {% if pack.actif %}pack-active{% endif %} {% if pack.verrouille %}pack-locked{% endif %}"
+                         {% if not pack.verrouille %}onclick="togglePackCard(this,'{{ pack.id }}')"{% endif %}
+                         id="card-{{ pack.id }}">
+                        <div class="pack-header">
+                            <div class="pack-icon">
+                                <img src="https://www.google.com/s2/favicons?domain={{ pack.logo_domain }}&sz=64"
+                                     alt="{{ pack.nom }}"
+                                     onerror="this.parentElement.innerHTML='{{ pack.icone }}'">
+                            </div>
+                            <div class="pack-info">
+                                <h4 class="pack-name">{{ pack.nom }}</h4>
+                                <p class="pack-desc">{{ pack.description }}</p>
+                            </div>
+                            {% if pack.verrouille %}
+                                <input type="hidden" name="packs" value="{{ pack.id }}">
+                                <span class="badge-locked">🔒 Toujours actif</span>
+                            {% else %}
+                                <label class="toggle" onclick="event.stopPropagation()">
+                                    <input type="checkbox" name="packs" value="{{ pack.id }}"
+                                           {% if pack.actif %}checked{% endif %}
+                                           onchange="onPackToggle(this)">
+                                    <span class="toggle-slider"></span>
+                                </label>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+
+                <div class="packs-validate" id="packsValidate" style="display:none;">
+                    <button type="submit" class="btn btn-primary btn-large" id="btnValidate">
+                        <span class="btn-icon">✓</span>
+                        <span class="btn-text">Valider la sélection</span>
+                    </button>
+                    <button type="button" class="btn btn-secondary" onclick="resetPacks()">
+                        Annuler
+                    </button>
+                    <span class="validate-hint" id="validateHint"></span>
+                </div>
+            </form>
+        </div>
+
+    </main>
+
+    <footer class="dashboard-footer">
+        <p class="session-info">
+            <span class="session-dot"></span>
+            Session active — Déconnexion automatique après 15 min d'inactivité
+        </p>
+    </footer>
+
+</div>
+
+<!-- Overlay progression glass -->
+<div id="progressOverlay">
+    <div class="progress-dialog">
+        <div class="progress-label"  id="progressLabel">Application du mode…</div>
+        <div class="progress-track">
+            <div class="progress-bar-fill" id="progressBar"></div>
+        </div>
+        <div class="progress-status" id="progressStatus">Connexion à OPNsense…</div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+var packsVisible = false;
+var initialState = {};
+
+document.addEventListener('DOMContentLoaded', function () {
+    document.querySelectorAll('#packsForm input[name="packs"]').forEach(function (cb) {
+        initialState[cb.value] = cb.checked;
+    });
+    {% if mode_actif == 'partiel' %}
+    togglePacks();
+    {% endif %}
+});
+
+function togglePacks() {
+    var section = document.getElementById('packsSection');
+    var icon    = document.getElementById('togglePacksIcon');
+    var text    = document.getElementById('togglePacksText');
+    packsVisible = !packsVisible;
+    if (packsVisible) {
+        section.style.display = 'block';
+        icon.textContent = '▲'; text.textContent = 'Masquer les sites';
+        setTimeout(function () { section.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 80);
+    } else {
+        section.style.display = 'none';
+        icon.textContent = '▼'; text.textContent = 'Voir les sites autorisés';
+    }
+}
+
+function togglePackCard(card, packId) {
+    var cb = card.querySelector('input[type="checkbox"]');
+    cb.checked = !cb.checked;
+    onPackToggle(cb);
+}
+
+function onPackToggle(cb) {
+    var card = cb.closest('.pack-card');
+    cb.checked ? card.classList.add('pack-active') : card.classList.remove('pack-active');
+    card.classList.toggle('pack-changed', cb.checked !== initialState[cb.value]);
+    checkForChanges();
+}
+
+function checkForChanges() {
+    var count = 0;
+    document.querySelectorAll('#packsForm input[name="packs"]').forEach(function (cb) {
+        if (cb.checked !== initialState[cb.value]) count++;
+    });
+    var bar  = document.getElementById('packsValidate');
+    var hint = document.getElementById('validateHint');
+    if (count > 0) {
+        bar.style.display = 'flex';
+        hint.textContent  = count + ' modification' + (count > 1 ? 's' : '') + ' en attente';
+    } else { bar.style.display = 'none'; }
+}
+
+function resetPacks() {
+    document.querySelectorAll('#packsForm input[name="packs"]').forEach(function (cb) {
+        cb.checked = initialState[cb.value];
+        var card = cb.closest('.pack-card');
+        card.classList.toggle('pack-active', cb.checked);
+        card.classList.remove('pack-changed');
+    });
+    document.getElementById('packsValidate').style.display = 'none';
+}
+
+function confirmChangeMode(mode, modeName) {
+    showConfirmModal(
+        'Passer en mode "' + modeName + '" ?',
+        'Cela affectera immédiatement tous les postes de la salle G.',
+        function () { applyMode(mode, modeName); }
+    );
+}
+
+function applyMode(mode, modeName) {
+    var overlay = document.getElementById('progressOverlay');
+    var bar     = document.getElementById('progressBar');
+    var label   = document.getElementById('progressLabel');
+    var status  = document.getElementById('progressStatus');
+
+    overlay.style.display = 'flex';
+    label.textContent = 'Passage en mode ' + modeName + '…';
+    status.textContent = 'Connexion à OPNsense…';
+    bar.style.width = '15%';
+
+    [{d:350,w:'36%',t:'Application des règles firewall…'},
+     {d:950,w:'62%',t:'Mise à jour de la whitelist…'},
+     {d:1600,w:'82%',t:'Finalisation…'}
+    ].forEach(function (s) {
+        setTimeout(function () { bar.style.width = s.w; status.textContent = s.t; }, s.d);
+    });
+
+    fetch('/admin/changer-mode', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode: mode })
+    })
+    .then(function (r) { return r.json(); })
+    .then(function (data) {
+        bar.style.width = '100%';
+        if (data.success) {
+            status.textContent = '✓ Mode appliqué avec succès !';
+            bar.style.background = 'linear-gradient(90deg,#16a34a,#22c55e)';
+            setTimeout(function () { window.location.reload(); }, 750);
+        } else {
+            status.textContent = '✕ ' + (data.message || 'Erreur inconnue');
+            bar.style.background = 'linear-gradient(90deg,#b91c1c,#ef4444)';
+            label.textContent = 'Échec';
+            setTimeout(function () { overlay.style.display = 'none'; }, 2800);
+        }
+    })
+    .catch(function () {
+        bar.style.width = '100%';
+        bar.style.background = 'linear-gradient(90deg,#b91c1c,#ef4444)';
+        status.textContent = '✕ Erreur réseau';
+        setTimeout(function () { overlay.style.display = 'none'; }, 2800);
+    });
+}
+</script>
+{% endblock %}

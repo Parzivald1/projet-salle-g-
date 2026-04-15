@@ -1,0 +1,507 @@
+{% extends "base.html" %}
+{# ═══════════════════════════════════════════════════════════════════
+   CFAI PORTAL — Portail d'Accès Sécurisé
+   UIMM · Auvergne-Rhône-Alpes
+   BEM : .login__* | Thèmes : cyan (Formateur) / orange (Élève)
+   ═══════════════════════════════════════════════════════════════════ #}
+
+{% block title %}CFAI Portal — Accès Sécurisé{% endblock %}
+{% block body_class %}page-portail{% endblock %}
+
+{% block head %}
+{# CSS dédié au portail (BEM isolé) #}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/login.css') }}">
+{% endblock %}
+
+{% block body %}
+<main class="login" role="main" id="loginRoot">
+
+    {# ── Canvas Three.js (injecté par premium.js) ── #}
+    <div class="login__bg" id="loginBg" aria-hidden="true"></div>
+    <div class="login__scanlines" aria-hidden="true"></div>
+
+    {# ════════════════════════════════════════════════
+       CARTE CENTRALE — Glassmorphism
+       ════════════════════════════════════════════════ #}
+    <div class="login__card" id="loginCard" data-role="formateur" aria-live="polite">
+
+        {# ── En-tête : logo 3D + identité ── #}
+        <header class="login__header">
+
+            {# Logo UIMM — rotation Y déclenchée par JS #}
+            <div class="login__logo-wrap" id="logoWrap" aria-hidden="true">
+                <img src="{{ url_for('static', filename='images/logo_uimm.jpg') }}"
+                     alt="UIMM Auvergne-Rhône-Alpes"
+                     class="login__logo"
+                     id="loginLogo"
+                     draggable="false">
+            </div>
+
+            {# Identité textuelle #}
+            <div class="login__brand">
+                <h1 class="login__brand-name">CFAI&nbsp;PORTAL</h1>
+                <p class="login__brand-sub">UIMM · Auvergne-Rhône-Alpes</p>
+                <span class="login__brand-tag" aria-label="Connexion sécurisée">
+                    <span class="login__brand-tag-dot"></span>
+                    Portail d'accès sécurisé
+                </span>
+            </div>
+
+        </header>
+
+        {# ════════════════════
+           SWITCHER DE RÔLE
+           ════════════════════ #}
+        <div class="login__role" id="roleSwitch" role="tablist"
+             aria-label="Sélection du profil d'accès">
+
+            {# Pilule glissante (position contrôlée par JS) #}
+            <div class="login__role-track" id="roleTrack" aria-hidden="true"></div>
+
+            <button type="button"
+                    class="login__role-btn login__role-btn--active"
+                    id="btnFormateur"
+                    role="tab" aria-selected="true"
+                    aria-controls="formFormateur"
+                    onclick="switchRole('formateur')">
+                <span class="login__role-icon" aria-hidden="true">🎓</span>
+                <span class="login__role-label">Formateur</span>
+            </button>
+
+            <button type="button"
+                    class="login__role-btn"
+                    id="btnEleve"
+                    role="tab" aria-selected="false"
+                    aria-controls="formEleve"
+                    onclick="switchRole('eleve')">
+                <span class="login__role-icon" aria-hidden="true">📚</span>
+                <span class="login__role-label">Élève</span>
+            </button>
+        </div>
+
+        {# ════════════════════
+           BADGE ÉTAT RÉSEAU
+           ════════════════════ #}
+        <div class="login__status" role="status" aria-label="État du réseau">
+            <span class="login__status-badge login__status-badge--{{ mode_actif }}">
+                {{ modes[mode_actif].nom }}
+            </span>
+            <span class="login__status-label">État du réseau</span>
+        </div>
+
+        {# ════════════════════════════════════════════════
+           FORMULAIRE FORMATEUR — Code 6 chiffres + cyan
+           ════════════════════════════════════════════════ #}
+        <form class="login__form login__form--formateur"
+              id="formFormateur"
+              action="{{ url_for('connexion_formateur') }}"
+              method="POST"
+              role="tabpanel"
+              aria-labelledby="btnFormateur"
+              data-no-transition
+              novalidate>
+
+            <div class="login__section">
+                <label class="login__label" id="labelCodeFormateur">
+                    Code d'accès formateur — 6 chiffres
+                </label>
+                <div class="login__code" aria-labelledby="labelCodeFormateur"
+                     role="group">
+                    <input type="text" name="code1" maxlength="1"
+                           inputmode="numeric" pattern="[0-9]"
+                           class="login__digit"
+                           placeholder="·"
+                           autocomplete="off" required
+                           aria-label="Chiffre 1">
+                    <input type="text" name="code2" maxlength="1"
+                           inputmode="numeric" pattern="[0-9]"
+                           class="login__digit"
+                           placeholder="·"
+                           autocomplete="off" required
+                           aria-label="Chiffre 2">
+                    <input type="text" name="code3" maxlength="1"
+                           inputmode="numeric" pattern="[0-9]"
+                           class="login__digit"
+                           placeholder="·"
+                           autocomplete="off" required
+                           aria-label="Chiffre 3">
+                    <input type="text" name="code4" maxlength="1"
+                           inputmode="numeric" pattern="[0-9]"
+                           class="login__digit"
+                           placeholder="·"
+                           autocomplete="off" required
+                           aria-label="Chiffre 4">
+                    <input type="text" name="code5" maxlength="1"
+                           inputmode="numeric" pattern="[0-9]"
+                           class="login__digit"
+                           placeholder="·"
+                           autocomplete="off" required
+                           aria-label="Chiffre 5">
+                    <input type="text" name="code6" maxlength="1"
+                           inputmode="numeric" pattern="[0-9]"
+                           class="login__digit"
+                           placeholder="·"
+                           autocomplete="off" required
+                           aria-label="Chiffre 6">
+                </div>
+            </div>
+
+            {# Consentement RGPD #}
+            <div class="login__rgpd">
+                <label class="login__rgpd-label">
+                    <input type="checkbox"
+                           id="consentFormateur"
+                           name="consent"
+                           class="login__checkbox"
+                           required>
+                    <span class="login__rgpd-text">
+                        J'accepte les <strong>Conditions d'Utilisation</strong> du réseau
+                        UIMM Pôle Formation et reconnais que mon activité peut être
+                        enregistrée à des fins de sécurité conformément au
+                        <strong>RGPD</strong>.
+                    </span>
+                </label>
+            </div>
+
+            {# Bouton avec fill + laser #}
+            <button type="submit"
+                    class="login__submit"
+                    id="submitFormateur"
+                    disabled
+                    aria-label="Se connecter en tant que formateur">
+                <span class="login__submit-fill" aria-hidden="true"></span>
+                <span class="login__submit-laser" id="laserFormateur" aria-hidden="true"></span>
+                <span class="login__submit-text">[ Accéder au Portail ]</span>
+            </button>
+
+        </form>
+
+
+        {# ════════════════════════════════════════════════
+           FORMULAIRE ÉLÈVE — Identifiant + orange
+           NOTE : La route /connexion-eleve doit être créée
+                  côté Flask (auth blueprint)
+           ════════════════════════════════════════════════ #}
+        <form class="login__form login__form--eleve login__form--hidden"
+              id="formEleve"
+              action="/connexion-eleve"
+              method="POST"
+              role="tabpanel"
+              aria-labelledby="btnEleve"
+              data-no-transition
+              novalidate>
+
+            {# Identifiant stagiaire #}
+            <div class="login__section">
+                <label class="login__label" for="eleveIdentifiant">
+                    Identifiant stagiaire
+                </label>
+                <div class="login__field">
+                    <div class="login__input-wrap">
+                        <input type="text"
+                               id="eleveIdentifiant"
+                               name="identifiant"
+                               class="login__input"
+                               placeholder="Prénom.NOM ou n° stagiaire"
+                               autocomplete="username"
+                               required>
+                        <span class="login__input-icon" aria-hidden="true">👤</span>
+                        <div class="login__input-glow" aria-hidden="true"></div>
+                    </div>
+                </div>
+            </div>
+
+            {# Code PIN #}
+            <div class="login__section">
+                <label class="login__label" id="labelCodeEleve">
+                    Code PIN — 6 chiffres
+                </label>
+                <div class="login__code" role="group" aria-labelledby="labelCodeEleve">
+                    <input type="text" name="pin1" maxlength="1"
+                           inputmode="numeric" pattern="[0-9]"
+                           class="login__digit"
+                           placeholder="·"
+                           autocomplete="off" required
+                           aria-label="PIN chiffre 1">
+                    <input type="text" name="pin2" maxlength="1"
+                           inputmode="numeric" pattern="[0-9]"
+                           class="login__digit"
+                           placeholder="·"
+                           autocomplete="off" required
+                           aria-label="PIN chiffre 2">
+                    <input type="text" name="pin3" maxlength="1"
+                           inputmode="numeric" pattern="[0-9]"
+                           class="login__digit"
+                           placeholder="·"
+                           autocomplete="off" required
+                           aria-label="PIN chiffre 3">
+                    <input type="text" name="pin4" maxlength="1"
+                           inputmode="numeric" pattern="[0-9]"
+                           class="login__digit"
+                           placeholder="·"
+                           autocomplete="off" required
+                           aria-label="PIN chiffre 4">
+                    <input type="text" name="pin5" maxlength="1"
+                           inputmode="numeric" pattern="[0-9]"
+                           class="login__digit"
+                           placeholder="·"
+                           autocomplete="off" required
+                           aria-label="PIN chiffre 5">
+                    <input type="text" name="pin6" maxlength="1"
+                           inputmode="numeric" pattern="[0-9]"
+                           class="login__digit"
+                           placeholder="·"
+                           autocomplete="off" required
+                           aria-label="PIN chiffre 6">
+                </div>
+            </div>
+
+            {# RGPD #}
+            <div class="login__rgpd">
+                <label class="login__rgpd-label">
+                    <input type="checkbox"
+                           id="consentEleve"
+                           name="consent"
+                           class="login__checkbox"
+                           required>
+                    <span class="login__rgpd-text">
+                        J'accepte les <strong>Conditions d'Utilisation</strong>
+                        du réseau CFAI et reconnais que mon activité peut être
+                        enregistrée conformément au <strong>RGPD</strong>.
+                    </span>
+                </label>
+            </div>
+
+            {# Bouton #}
+            <button type="submit"
+                    class="login__submit"
+                    id="submitEleve"
+                    disabled
+                    aria-label="Se connecter en tant qu'élève">
+                <span class="login__submit-fill" aria-hidden="true"></span>
+                <span class="login__submit-laser" id="laserEleve" aria-hidden="true"></span>
+                <span class="login__submit-text">[ Accéder au Portail ]</span>
+            </button>
+
+        </form>
+
+        {# ── Pied de carte ── #}
+        <footer class="login__footer">
+            <p class="login__help">
+                Accès restreint aux membres habilités CFAI
+            </p>
+            <div class="login__secure" aria-label="Connexion chiffrée">
+                <span class="login__secure-dot" aria-hidden="true"></span>
+                Connexion sécurisée TLS
+            </div>
+        </footer>
+
+    </div>{# /.login__card #}
+</main>
+{% endblock %}
+
+
+{% block scripts %}
+{# ══════════════════════════════════════════════════════════════════
+   JS inline — logique propre au portail CFAI
+   premium.js gère : Three.js, laser scan, logo spin, role switch
+   ══════════════════════════════════════════════════════════════════ #}
+<script>
+/* ─── Module auto-exécuté : logique du portail ─────────────────────── */
+(function CfaiPortal() {
+    'use strict';
+
+    /* ── Refs DOM ── */
+    const card          = document.getElementById('loginCard');
+    const logoWrap      = document.getElementById('logoWrap');
+    const roleTrack     = document.getElementById('roleTrack');
+    const btnFormateur  = document.getElementById('btnFormateur');
+    const btnEleve      = document.getElementById('btnEleve');
+    const formFormateur = document.getElementById('formFormateur');
+    const formEleve     = document.getElementById('formEleve');
+    const submitFormateurBtn = document.getElementById('submitFormateur');
+    const submitEleveBtn     = document.getElementById('submitEleve');
+
+    /* ═══════════════════════════════════════════════════════════════
+       1. NAVIGATION CODE — chiffres (auto-avance + backspace)
+       ═══════════════════════════════════════════════════════════════ */
+    function bindDigitInputs(container, submitBtn, extraValidator) {
+        const digits = Array.from(container.querySelectorAll('.login__digit'));
+        if (!digits.length) return;
+
+        digits.forEach((input, idx) => {
+            /* Saisie */
+            input.addEventListener('input', e => {
+                e.target.value = e.target.value.replace(/[^0-9]/g, '');
+                /* Classe --filled */
+                e.target.classList.toggle('login__digit--filled', e.target.value.length > 0);
+                /* Avance auto */
+                if (e.target.value && idx < digits.length - 1) {
+                    digits[idx + 1].focus();
+                }
+                validateForm(digits, container, submitBtn, extraValidator);
+            });
+
+            /* Retour arrière */
+            input.addEventListener('keydown', e => {
+                if (e.key === 'Backspace' && !e.target.value && idx > 0) {
+                    digits[idx - 1].focus();
+                }
+                validateForm(digits, container, submitBtn, extraValidator);
+            });
+
+            /* Coller un code entier */
+            input.addEventListener('paste', e => {
+                e.preventDefault();
+                const pasted = e.clipboardData.getData('text').replace(/[^0-9]/g, '');
+                digits.forEach((d, i) => {
+                    d.value = pasted[i] || '';
+                    d.classList.toggle('login__digit--filled', d.value.length > 0);
+                });
+                const lastFocus = Math.min(pasted.length, digits.length) - 1;
+                if (lastFocus >= 0 && lastFocus < digits.length - 1) {
+                    digits[lastFocus + 1].focus();
+                }
+                validateForm(digits, container, submitBtn, extraValidator);
+            });
+        });
+    }
+
+    /* ── Validation générique ── */
+    function validateForm(digits, container, submitBtn, extraValidator) {
+        const codeOk    = digits.every(d => /^[0-9]$/.test(d.value));
+        const consentEl = container.querySelector('.login__checkbox');
+        const consentOk = consentEl ? consentEl.checked : true;
+        const extraOk   = extraValidator ? extraValidator() : true;
+
+        submitBtn.disabled = !(codeOk && consentOk && extraOk);
+    }
+
+    /* ── Formateur : 6 chiffres ── */
+    const consentFormateur = document.getElementById('consentFormateur');
+    const formateurDigits  = Array.from(formFormateur.querySelectorAll('.login__digit'));
+    bindDigitInputs(formFormateur, submitFormateurBtn, null);
+    consentFormateur.addEventListener('change', () =>
+        validateForm(formateurDigits, formFormateur, submitFormateurBtn, null)
+    );
+
+    /* ── Élève : identifiant + 6 chiffres PIN ── */
+    const consentEleve    = document.getElementById('consentEleve');
+    const eleveIdentInput = document.getElementById('eleveIdentifiant');
+    const elevePinDigits  = Array.from(formEleve.querySelectorAll('.login__digit'));
+
+    bindDigitInputs(formEleve, submitEleveBtn, () => {
+        return eleveIdentInput.value.trim().length >= 3;
+    });
+
+    eleveIdentInput.addEventListener('input', () =>
+        validateForm(elevePinDigits, formEleve, submitEleveBtn, () =>
+            eleveIdentInput.value.trim().length >= 3
+        )
+    );
+    consentEleve.addEventListener('change', () =>
+        validateForm(elevePinDigits, formEleve, submitEleveBtn, () =>
+            eleveIdentInput.value.trim().length >= 3
+        )
+    );
+
+    /* ═══════════════════════════════════════════════════════════════
+       2. SWITCH DE RÔLE (exposé globalement pour les boutons inline)
+       ═══════════════════════════════════════════════════════════════ */
+    window.switchRole = function switchRole(role) {
+        if (card.dataset.role === role) return;
+        card.dataset.role = role;
+
+        const isEleve = role === 'eleve';
+
+        /* — Thème de la carte — */
+        card.classList.toggle('login__card--eleve', isEleve);
+
+        /* — Pilule switcher — */
+        roleTrack.classList.toggle('login__role-track--right', isEleve);
+
+        /* — Boutons actifs — */
+        btnFormateur.classList.toggle('login__role-btn--active', !isEleve);
+        btnFormateur.setAttribute('aria-selected', String(!isEleve));
+        btnEleve.classList.toggle('login__role-btn--active', isEleve);
+        btnEleve.setAttribute('aria-selected', String(isEleve));
+
+        /* — Affichage formulaires (avec animation reveal) — */
+        if (isEleve) {
+            formFormateur.classList.add('login__form--hidden');
+            formFormateur.classList.remove('login__form--reveal');
+            formEleve.classList.remove('login__form--hidden');
+            /* On force un reflow pour que l'animation se rejoue */
+            void formEleve.offsetWidth;
+            formEleve.classList.add('login__form--reveal');
+        } else {
+            formEleve.classList.add('login__form--hidden');
+            formEleve.classList.remove('login__form--reveal');
+            formFormateur.classList.remove('login__form--hidden');
+            void formFormateur.offsetWidth;
+            formFormateur.classList.add('login__form--reveal');
+        }
+
+        /* — Spin du logo au changement — */
+        spinLogo();
+
+        /* — Mise à jour Three.js accent color — */
+        if (typeof window.updateParticleAccent === 'function') {
+            window.updateParticleAccent(isEleve ? 0xff8c1a : 0x00e5ff);
+        }
+
+        /* — Reset des champs — */
+        formFormateur.querySelectorAll('.login__digit').forEach(d => {
+            d.value = '';
+            d.classList.remove('login__digit--filled');
+        });
+        if (eleveIdentInput) eleveIdentInput.value = '';
+        formEleve.querySelectorAll('.login__digit').forEach(d => {
+            d.value = '';
+            d.classList.remove('login__digit--filled');
+        });
+        submitFormateurBtn.disabled = true;
+        submitEleveBtn.disabled     = true;
+
+        /* Focus premier champ actif */
+        const activeForm = isEleve ? formEleve : formFormateur;
+        const firstInput = activeForm.querySelector('input:not([type="checkbox"])');
+        if (firstInput) setTimeout(() => firstInput.focus(), 80);
+    };
+
+    /* ═══════════════════════════════════════════════════════════════
+       3. SPIN LOGO (exposé pour premium.js + usage interne)
+       ═══════════════════════════════════════════════════════════════ */
+    window.spinLogo = function spinLogo() {
+        if (!logoWrap) return;
+        logoWrap.classList.remove('login__logo-wrap--spinning');
+        /* Force reflow pour rejouer l'animation */
+        void logoWrap.offsetWidth;
+        logoWrap.classList.add('login__logo-wrap--spinning');
+        /* Retire la classe après l'animation */
+        setTimeout(() => logoWrap.classList.remove('login__logo-wrap--spinning'), 800);
+    };
+
+    /* Spin automatique au chargement */
+    window.addEventListener('load', () => setTimeout(window.spinLogo, 400));
+
+    /* ═══════════════════════════════════════════════════════════════
+       4. FOCUS GLOW SUR LE LOGO AU SURVOL
+       ═══════════════════════════════════════════════════════════════ */
+    if (logoWrap) {
+        logoWrap.addEventListener('click', window.spinLogo);
+        logoWrap.style.cursor = 'pointer';
+        logoWrap.setAttribute('title', 'Cliquer pour faire tourner');
+        logoWrap.setAttribute('role', 'button');
+        logoWrap.setAttribute('tabindex', '0');
+        logoWrap.addEventListener('keydown', e => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                window.spinLogo();
+            }
+        });
+    }
+
+})();
+</script>
+{% endblock %}
