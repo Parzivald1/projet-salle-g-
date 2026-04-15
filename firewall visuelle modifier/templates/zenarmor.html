@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+
+{% block title %}Monitoring Zenarmor | UIMM{% endblock %}
+
+{% block body_class %}page-dashboard{% endblock %}
+
+{% block body %}
+<div class="dashboard-container">
+    <header class="dashboard-header">
+        <div class="header-left">
+            <img src="{{ url_for('static', filename='images/logo_uimm.jpg') }}" alt="UIMM" class="header-logo">
+            <div class="header-title">
+                <h1>Trafic Réseau</h1>
+                <p>Interface Zenarmor</p>
+            </div>
+        </div>
+        
+        <div class="header-right">
+            <a href="{{ url_for('portail') }}" class="btn btn-secondary" style="padding: 0.5rem 1rem;">
+                <span class="btn-icon">&#8592;</span>
+                <span class="btn-text">Retour Accueil</span>
+            </a>
+        </div>
+    </header>
+    
+    <main class="dashboard-main" style="max-width: 95%; height: 80vh; display: flex; flex-direction: column; padding-top: 1rem;">
+        
+        <!-- Intégration stricte de Zenarmor (Iframe uniquement) -->
+        <div class="mode-card active-total" style="flex: 1; padding: 0; overflow: hidden; display: flex; flex-direction: column;">
+            <iframe 
+                src="{{ zenarmor_url }}" 
+                style="flex: 1; width: 100%; border: none; min-height: 500px;"
+                id="zenIframe"
+                title="Dashboard Zenarmor">
+            </iframe>
+        </div>
+    </main>
+</div>
+{% endblock %}

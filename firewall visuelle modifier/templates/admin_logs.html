@@ -1,0 +1,652 @@
+{% extends "base.html" %}
+
+{% block title %}Monitoring Réseau | UIMM{% endblock %}
+
+{% block body_class %}page-dashboard{% endblock %}
+
+{% block body %}
+<div class="dashboard-container">
+    <header class="dashboard-header">
+        <div class="header-left">
+            <img src="{{ url_for('static', filename='images/logo_uimm.jpg') }}" alt="UIMM" class="header-logo">
+            <div class="header-title">
+                <h1>Monitoring Réseau</h1>
+                <p>Salle G — Requêtes DNS en temps réel</p>
+            </div>
+        </div>
+        
+        <div class="header-right">
+            <div class="monitor-pulse" id="pulseIndicator">
+                <span class="pulse-dot"></span>
+                <span class="pulse-label">Live</span>
+            </div>
+            <a href="{{ url_for('portail') }}" class="btn btn-secondary" style="padding: 0.5rem 1rem;">
+                <span class="btn-icon">&#8592;</span>
+                <span class="btn-text">Retour</span>
+            </a>
+        </div>
+    </header>
+
+    <main class="dashboard-main" style="max-width: 95%; padding-top: 1rem;">
+        
+        <!-- Stats cards -->
+        <div class="monitor-stats" id="statsBar">
+            <div class="stat-card">
+                <div class="stat-icon">&#128269;</div>
+                <div class="stat-body">
+                    <span class="stat-value" id="statTotal">—</span>
+                    <span class="stat-label">Requêtes</span>
+                </div>
+            </div>
+            <div class="stat-card stat-blocked">
+                <div class="stat-icon">&#128721;</div>
+                <div class="stat-body">
+                    <span class="stat-value" id="statBlocked">—</span>
+                    <span class="stat-label">Bloquées</span>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">&#128187;</div>
+                <div class="stat-body">
+                    <span class="stat-value" id="statClients">—</span>
+                    <span class="stat-label">Postes actifs</span>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">&#127760;</div>
+                <div class="stat-body">
+                    <span class="stat-value" id="statDomains">—</span>
+                    <span class="stat-label">Domaines</span>
+                </div>
+            </div>
+            <div class="stat-card stat-time">
+                <div class="stat-icon">&#9201;</div>
+                <div class="stat-body">
+                    <span class="stat-value" id="statPoll">—</span>
+                    <span class="stat-label">Dernier poll</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Toolbar -->
+        <div class="monitor-toolbar">
+            <div class="toolbar-left">
+                <div class="search-box">
+                    <span class="search-icon">&#128269;</span>
+                    <input type="text" id="searchInput" placeholder="Filtrer par IP, MAC ou domaine..." autocomplete="off">
+                </div>
+                <div class="filter-group">
+                    <button class="filter-btn active" data-filter="all" onclick="setFilter('all')">Tout</button>
+                    <button class="filter-btn" data-filter="blocked" onclick="setFilter('blocked')">Bloquées</button>
+                    <button class="filter-btn" data-filter="passed" onclick="setFilter('passed')">Autorisées</button>
+                </div>
+            </div>
+            <div class="toolbar-right">
+                <button class="btn btn-secondary btn-small" onclick="togglePause()" id="btnPause">
+                    <span id="pauseIcon">&#9646;&#9646;</span>
+                    <span id="pauseText">Pause</span>
+                </button>
+                <button class="btn btn-secondary btn-small" onclick="clearBuffer()">
+                    <span>&#128465;</span>
+                    <span>Vider</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Table -->
+        <div class="monitor-table-wrap">
+            <table class="monitor-table" id="dnsTable">
+                <thead>
+                    <tr>
+                        <th class="col-ip">IP Client</th>
+                        <th class="col-mac">Adresse MAC</th>
+                        <th class="col-domain">Domaine</th>
+                        <th class="col-count">Requêtes</th>
+                        <th class="col-blocked">Bloquées</th>
+                        <th class="col-time">Dernière activité</th>
+                        <th class="col-detail">Détails</th>
+                    </tr>
+                </thead>
+                <tbody id="dnsBody">
+                    <tr class="empty-row">
+                        <td colspan="7">
+                            <div class="empty-state">
+                                <div class="empty-icon">&#128225;</div>
+                                <p>En attente de données...</p>
+                                <p class="empty-sub">Les requêtes DNS des élèves apparaîtront ici</p>
+                            </div>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+    </main>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<style>
+    /* =========================================================================
+       MONITORING PAGE
+       ========================================================================= */
+
+    /* Stats bar */
+    .monitor-stats {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+        gap: 0.75rem;
+        margin-bottom: 1.25rem;
+    }
+    .stat-card {
+        background: rgba(255,255,255,0.07);
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(255,255,255,0.1);
+        border-radius: var(--radius-lg);
+        padding: 1rem 1.25rem;
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        transition: all var(--transition-normal);
+    }
+    .stat-card:hover {
+        background: rgba(255,255,255,0.1);
+        transform: translateY(-1px);
+    }
+    .stat-icon {
+        font-size: 1.4rem;
+        opacity: 0.8;
+    }
+    .stat-body {
+        display: flex;
+        flex-direction: column;
+    }
+    .stat-value {
+        font-family: var(--font-mono);
+        font-size: 1.3rem;
+        font-weight: 700;
+        color: var(--white);
+        line-height: 1.2;
+    }
+    .stat-label {
+        font-size: 0.75rem;
+        color: rgba(255,255,255,0.5);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
+    .stat-blocked .stat-value {
+        color: var(--uimm-red-light);
+    }
+
+    /* Pulse indicator */
+    .monitor-pulse {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.4rem 0.9rem;
+        background: rgba(34, 197, 94, 0.15);
+        border: 1px solid rgba(34, 197, 94, 0.3);
+        border-radius: var(--radius-full);
+        margin-right: 0.75rem;
+    }
+    .monitor-pulse.paused {
+        background: rgba(245, 158, 11, 0.15);
+        border-color: rgba(245, 158, 11, 0.3);
+    }
+    .monitor-pulse.paused .pulse-dot {
+        background: var(--warning);
+        animation: none;
+    }
+    .monitor-pulse.paused .pulse-label {
+        color: var(--warning);
+    }
+    .pulse-dot {
+        width: 8px;
+        height: 8px;
+        background: var(--success);
+        border-radius: 50%;
+        animation: pulse 2s ease-in-out infinite;
+    }
+    @keyframes pulse {
+        0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.4); }
+        50% { opacity: 0.7; box-shadow: 0 0 0 6px rgba(34, 197, 94, 0); }
+    }
+    .pulse-label {
+        font-size: 0.8rem;
+        font-weight: 600;
+        color: var(--success);
+        font-family: var(--font-mono);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
+
+    /* Toolbar */
+    .monitor-toolbar {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 1rem;
+        margin-bottom: 1rem;
+        flex-wrap: wrap;
+    }
+    .toolbar-left {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        flex-wrap: wrap;
+    }
+    .toolbar-right {
+        display: flex;
+        gap: 0.5rem;
+    }
+    .search-box {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        background: rgba(255,255,255,0.08);
+        border: 1px solid rgba(255,255,255,0.15);
+        border-radius: var(--radius-md);
+        padding: 0.5rem 0.75rem;
+        min-width: 280px;
+        transition: border-color var(--transition-fast);
+    }
+    .search-box:focus-within {
+        border-color: rgba(255,255,255,0.35);
+        background: rgba(255,255,255,0.12);
+    }
+    .search-icon {
+        font-size: 0.85rem;
+        opacity: 0.5;
+    }
+    .search-box input {
+        background: none;
+        color: var(--white);
+        font-size: 0.9rem;
+        width: 100%;
+    }
+    .search-box input::placeholder {
+        color: rgba(255,255,255,0.35);
+    }
+    .filter-group {
+        display: flex;
+        background: rgba(255,255,255,0.06);
+        border-radius: var(--radius-md);
+        border: 1px solid rgba(255,255,255,0.1);
+        overflow: hidden;
+    }
+    .filter-btn {
+        padding: 0.45rem 0.85rem;
+        font-size: 0.8rem;
+        font-weight: 500;
+        color: rgba(255,255,255,0.5);
+        transition: all var(--transition-fast);
+        border-right: 1px solid rgba(255,255,255,0.08);
+    }
+    .filter-btn:last-child { border-right: none; }
+    .filter-btn:hover {
+        color: rgba(255,255,255,0.8);
+        background: rgba(255,255,255,0.06);
+    }
+    .filter-btn.active {
+        color: var(--white);
+        background: rgba(255,255,255,0.12);
+        font-weight: 600;
+    }
+
+    /* Table */
+    .monitor-table-wrap {
+        background: rgba(255,255,255,0.04);
+        border: 1px solid rgba(255,255,255,0.08);
+        border-radius: var(--radius-lg);
+        overflow: hidden;
+        max-height: 62vh;
+        overflow-y: auto;
+    }
+    .monitor-table-wrap::-webkit-scrollbar {
+        width: 6px;
+    }
+    .monitor-table-wrap::-webkit-scrollbar-track {
+        background: transparent;
+    }
+    .monitor-table-wrap::-webkit-scrollbar-thumb {
+        background: rgba(255,255,255,0.15);
+        border-radius: 3px;
+    }
+    .monitor-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.88rem;
+    }
+    .monitor-table thead {
+        position: sticky;
+        top: 0;
+        z-index: 10;
+    }
+    .monitor-table th {
+        background: rgba(10, 61, 92, 0.95);
+        backdrop-filter: blur(8px);
+        color: rgba(255,255,255,0.65);
+        font-weight: 600;
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        padding: 0.75rem 1rem;
+        text-align: left;
+        border-bottom: 1px solid rgba(255,255,255,0.1);
+        white-space: nowrap;
+    }
+    .monitor-table td {
+        padding: 0.65rem 1rem;
+        color: rgba(255,255,255,0.85);
+        border-bottom: 1px solid rgba(255,255,255,0.04);
+        vertical-align: middle;
+    }
+    .monitor-table tbody tr {
+        transition: background var(--transition-fast);
+    }
+    .monitor-table tbody tr:hover {
+        background: rgba(255,255,255,0.06);
+    }
+    .monitor-table tbody tr.row-new {
+        animation: rowFlash 1.5s ease;
+    }
+    @keyframes rowFlash {
+        0% { background: rgba(34, 197, 94, 0.15); }
+        100% { background: transparent; }
+    }
+
+    /* Column widths */
+    .col-ip { width: 12%; }
+    .col-mac { width: 15%; }
+    .col-domain { width: 25%; }
+    .col-count { width: 10%; text-align: center; }
+    .col-blocked { width: 10%; text-align: center; }
+    .col-time { width: 13%; }
+    .col-detail { width: 15%; }
+
+    /* Cell styles */
+    .cell-ip {
+        font-family: var(--font-mono);
+        font-size: 0.85rem;
+        font-weight: 500;
+    }
+    .cell-mac {
+        font-family: var(--font-mono);
+        font-size: 0.78rem;
+        color: rgba(255,255,255,0.5);
+    }
+    .cell-hostname {
+        font-size: 0.72rem;
+        color: rgba(255,255,255,0.35);
+        display: block;
+        margin-top: 2px;
+    }
+    .cell-domain {
+        font-weight: 500;
+    }
+    .cell-count {
+        font-family: var(--font-mono);
+        font-weight: 700;
+        text-align: center;
+        font-size: 0.95rem;
+    }
+    .cell-blocked-count {
+        font-family: var(--font-mono);
+        font-weight: 700;
+        text-align: center;
+        color: var(--uimm-red-light);
+    }
+    .cell-blocked-zero {
+        color: rgba(255,255,255,0.2);
+    }
+    .cell-time {
+        font-family: var(--font-mono);
+        font-size: 0.82rem;
+        color: rgba(255,255,255,0.55);
+    }
+    .cell-ago {
+        font-size: 0.72rem;
+        color: rgba(255,255,255,0.3);
+        display: block;
+        margin-top: 2px;
+    }
+
+    /* Detail toggle */
+    .detail-toggle {
+        font-size: 0.75rem;
+        color: rgba(255,255,255,0.4);
+        cursor: pointer;
+        padding: 0.2rem 0.5rem;
+        border-radius: var(--radius-sm);
+        transition: all var(--transition-fast);
+    }
+    .detail-toggle:hover {
+        color: rgba(255,255,255,0.7);
+        background: rgba(255,255,255,0.08);
+    }
+    .sub-domains {
+        display: none;
+        margin-top: 0.4rem;
+        font-size: 0.72rem;
+        color: rgba(255,255,255,0.35);
+        font-family: var(--font-mono);
+        line-height: 1.6;
+    }
+    .sub-domains.visible {
+        display: block;
+    }
+    .sub-domain-tag {
+        display: inline-block;
+        background: rgba(255,255,255,0.06);
+        padding: 0.15rem 0.45rem;
+        border-radius: var(--radius-sm);
+        margin: 0.1rem 0.15rem;
+        border: 1px solid rgba(255,255,255,0.06);
+    }
+
+    /* Empty state */
+    .empty-state {
+        text-align: center;
+        padding: 3rem 1rem;
+        color: rgba(255,255,255,0.4);
+    }
+    .empty-icon {
+        font-size: 2.5rem;
+        margin-bottom: 0.75rem;
+        opacity: 0.5;
+    }
+    .empty-sub {
+        font-size: 0.82rem;
+        opacity: 0.6;
+        margin-top: 0.3rem;
+    }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+        .monitor-stats {
+            grid-template-columns: repeat(2, 1fr);
+        }
+        .search-box {
+            min-width: 100%;
+        }
+        .monitor-toolbar {
+            flex-direction: column;
+            align-items: stretch;
+        }
+        .toolbar-left, .toolbar-right {
+            width: 100%;
+        }
+        .col-mac, .col-detail {
+            display: none;
+        }
+    }
+</style>
+
+<script>
+(function() {
+    var REFRESH_INTERVAL = 5000;
+    var isPaused = false;
+    var currentFilter = 'all';
+    var searchQuery = '';
+    var refreshTimer = null;
+    var previousEntryKeys = new Set();
+
+    function fetchLogs() {
+        if (isPaused) return;
+
+        fetch('/api/admin/logs')
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                updateStats(data.stats);
+                updateTable(data.entries);
+            })
+            .catch(function(err) {
+                console.error('Erreur fetch logs:', err);
+            });
+    }
+
+    function updateStats(stats) {
+        document.getElementById('statTotal').textContent = stats.total_queries.toLocaleString();
+        document.getElementById('statBlocked').textContent = stats.total_blocked.toLocaleString();
+        document.getElementById('statClients').textContent = stats.active_clients;
+        document.getElementById('statDomains').textContent = stats.unique_domains;
+        document.getElementById('statPoll').textContent = stats.last_poll;
+    }
+
+    function updateTable(entries) {
+        var tbody = document.getElementById('dnsBody');
+        var filtered = filterEntries(entries);
+        var newKeys = new Set();
+
+        if (filtered.length === 0) {
+            tbody.innerHTML = '<tr class="empty-row"><td colspan="7">' +
+                '<div class="empty-state"><div class="empty-icon">&#128269;</div>' +
+                '<p>Aucune requête correspondante</p></div></td></tr>';
+            previousEntryKeys = newKeys;
+            return;
+        }
+
+        var html = '';
+        for (var i = 0; i < filtered.length; i++) {
+            var e = filtered[i];
+            var key = e.ip + '|' + e.domain;
+            newKeys.add(key);
+            var isNew = !previousEntryKeys.has(key);
+
+            var blockedClass = e.blocked_count > 0 ? 'cell-blocked-count' : 'cell-blocked-count cell-blocked-zero';
+            var blockedVal = e.blocked_count > 0 ? e.blocked_count : '—';
+
+            var subHtml = '';
+            if (e.sub_domains && e.sub_domains.length > 0) {
+                for (var j = 0; j < e.sub_domains.length; j++) {
+                    subHtml += '<span class="sub-domain-tag">' + escapeHtml(e.sub_domains[j]) + '</span>';
+                }
+            }
+
+            html += '<tr class="' + (isNew ? 'row-new' : '') + '">' +
+                '<td><span class="cell-ip">' + escapeHtml(e.ip) + '</span></td>' +
+                '<td><span class="cell-mac">' + escapeHtml(e.mac) + '</span>' +
+                    (e.hostname ? '<span class="cell-hostname">' + escapeHtml(e.hostname) + '</span>' : '') +
+                '</td>' +
+                '<td><span class="cell-domain">' + escapeHtml(e.domain) + '</span></td>' +
+                '<td><span class="cell-count">' + e.count + '</span></td>' +
+                '<td><span class="' + blockedClass + '">' + blockedVal + '</span></td>' +
+                '<td><span class="cell-time">' + escapeHtml(e.last_seen) + '</span>' +
+                    '<span class="cell-ago">' + timeAgo(e.last_seen_ts) + '</span></td>' +
+                '<td>' +
+                    (subHtml ? '<span class="detail-toggle" onclick="toggleDetail(this)">&#9660; sous-domaines</span>' +
+                    '<div class="sub-domains">' + subHtml + '</div>' : '<span style="color:rgba(255,255,255,0.15)">—</span>') +
+                '</td></tr>';
+        }
+
+        tbody.innerHTML = html;
+        previousEntryKeys = newKeys;
+    }
+
+    function filterEntries(entries) {
+        return entries.filter(function(e) {
+            // Type filter
+            if (currentFilter === 'blocked' && e.blocked_count === 0) return false;
+            if (currentFilter === 'passed' && e.blocked_count > 0) return false;
+
+            // Search
+            if (searchQuery) {
+                var q = searchQuery.toLowerCase();
+                var match = e.ip.toLowerCase().indexOf(q) !== -1 ||
+                            e.mac.toLowerCase().indexOf(q) !== -1 ||
+                            e.domain.toLowerCase().indexOf(q) !== -1 ||
+                            (e.hostname && e.hostname.toLowerCase().indexOf(q) !== -1);
+                if (!match) return false;
+            }
+
+            return true;
+        });
+    }
+
+    function timeAgo(ts) {
+        var diff = Math.floor(Date.now() / 1000 - ts);
+        if (diff < 5) return "à l'instant";
+        if (diff < 60) return 'il y a ' + diff + 's';
+        if (diff < 3600) return 'il y a ' + Math.floor(diff / 60) + 'min';
+        return 'il y a ' + Math.floor(diff / 3600) + 'h';
+    }
+
+    function escapeHtml(str) {
+        if (!str) return '';
+        return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    // Exposed functions
+    window.setFilter = function(filter) {
+        currentFilter = filter;
+        var btns = document.querySelectorAll('.filter-btn');
+        btns.forEach(function(b) {
+            b.classList.toggle('active', b.getAttribute('data-filter') === filter);
+        });
+        fetchLogs();
+    };
+
+    window.togglePause = function() {
+        isPaused = !isPaused;
+        var pulse = document.getElementById('pulseIndicator');
+        var icon = document.getElementById('pauseIcon');
+        var text = document.getElementById('pauseText');
+        if (isPaused) {
+            pulse.classList.add('paused');
+            icon.innerHTML = '&#9654;';
+            text.textContent = 'Reprendre';
+        } else {
+            pulse.classList.remove('paused');
+            icon.innerHTML = '&#9646;&#9646;';
+            text.textContent = 'Pause';
+            fetchLogs();
+        }
+    };
+
+    window.clearBuffer = function() {
+        if (confirm('Vider le buffer de logs ? (les nouvelles requêtes continueront d\'arriver)')) {
+            fetch('/api/admin/clear', { method: 'POST' })
+                .then(function() { fetchLogs(); });
+        }
+    };
+
+    window.toggleDetail = function(el) {
+        var sub = el.nextElementSibling;
+        if (sub) {
+            sub.classList.toggle('visible');
+            el.innerHTML = sub.classList.contains('visible') ? '&#9650; sous-domaines' : '&#9660; sous-domaines';
+        }
+    };
+
+    // Search input
+    document.getElementById('searchInput').addEventListener('input', function(ev) {
+        searchQuery = ev.target.value;
+        fetchLogs();
+    });
+
+    // Start
+    fetchLogs();
+    refreshTimer = setInterval(fetchLogs, REFRESH_INTERVAL);
+})();
+</script>
+{% endblock %}
